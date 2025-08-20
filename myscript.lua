@@ -21,6 +21,16 @@ local BOX_TRANSPARENCY = 0.6
 -- Table to store esp boxes per model
 local espBoxes = {}
 
+local function notify(title, text, duration)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = title,
+            Text = text,
+            Duration = duration or 3,
+        })
+    end)
+end
+
 local function create3DBox(model)
     local root = model:FindFirstChild("HumanoidRootPart")
     if not root then return end
@@ -43,6 +53,9 @@ local function create3DBox(model)
     box.Parent = root
 
     espBoxes[model] = box
+
+    -- Notify about new enemy ESP
+    notify("ESP", "New enemy detected and highlighted!", 4)
 end
 
 local function remove3DBox(model)
@@ -73,3 +86,4 @@ workspace.DescendantRemoving:Connect(function(descendant)
         remove3DBox(descendant)
     end
 end)
+
