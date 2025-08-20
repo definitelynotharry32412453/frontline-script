@@ -22,7 +22,6 @@ notify("Script", "Loading...", 5)
 
 -- Load ESP library
 local espLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/andrewc0de/Roblox/main/Dependencies/ESP.lua"))()
-
 if not espLib then
     notify("Error", "Failed to load ESP library.", 5)
     return
@@ -153,22 +152,10 @@ local espBtn = createButton("ESP: ON", 120, function()
     if espEnabled then
         esp.enemy = true
         esp:Toggle(true)
-        -- Re-add ESP for current models
-        for _, model in ipairs(workspace:GetDescendants()) do
-            if model:IsA("Model") and model.Name == "soldier_model" and not model:FindFirstChild("friendly_marker") then
-                esp:Toggle(true) -- apply to each listener source
-            end
-        end
         notify("Toggle", "ESP enabled", 3)
     else
         esp.enemy = false
         esp:Toggle(false)
-        -- Remove ESP visuals for models
-        for _, model in ipairs(workspace:GetDescendants()) do
-            if model:IsA("Model") and model.Name == "soldier_model" then
-                pcall(function() esp:Remove(model) end)
-            end
-        end
         notify("Toggle", "ESP disabled", 3)
     end
 end)
@@ -176,5 +163,4 @@ end)
 -- Final Load Notification
 local loadTime = os.clock()
 notify("Loaded", string.format("Loaded in %.2f seconds", loadTime), 5)
-
 
