@@ -6,7 +6,7 @@ local TRANSPARENCY = 1
 local notifications = false
 local hitboxesEnabled = true
 local espEnabled = true
-local aimbotEnabled = false  -- default off
+local aimbotEnabled = true  -- Enabled at start
 
 -- Notification helper
 local function notify(title, text, duration)
@@ -164,9 +164,10 @@ local espBtn = createButton("ESP: ON", 120, function()
 end)
 
 -- Toggle Aimbot
-local aimbotBtn = createButton("Aimbot: OFF", 160, function()
+local aimbotBtn = createButton("Aimbot: ON", 160, function()
     aimbotEnabled = not aimbotEnabled
     aimbotBtn.Text = aimbotEnabled and "Aimbot: ON" or "Aimbot: OFF"
+    aimbotCircle.Visible = aimbotEnabled
     notify("Toggle", "Aimbot " .. (aimbotEnabled and "enabled" or "disabled"), 3)
 end)
 
@@ -179,21 +180,12 @@ aimbotCircle.Size = UDim2.new(0, circleRadius * 2, 0, circleRadius * 2)
 aimbotCircle.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
 aimbotCircle.BackgroundTransparency = 0.5
 aimbotCircle.BorderSizePixel = 0
-aimbotCircle.Visible = false
+aimbotCircle.Visible = aimbotEnabled
 aimbotCircle.ZIndex = 10
 aimbotCircle.ClipsDescendants = true
-aimbotCircle.AutomaticSize = Enum.AutomaticSize.None
-aimbotCircle.Shape = Enum.FrameShape.Circle or nil  -- if your Roblox version supports it
 
--- Roblox doesn't natively support circle frames, so we use a UICorner:
 local uiCorner = Instance.new("UICorner", aimbotCircle)
 uiCorner.CornerRadius = UDim.new(1, 0)
-
--- Show/hide circle based on aimbot toggle
-local function updateAimbotCircle()
-    aimbotCircle.Visible = aimbotEnabled
-end
-updateAimbotCircle()
 
 -- Setup services
 local camera = workspace.CurrentCamera
@@ -223,7 +215,6 @@ end
 
 -- Smooth aiming: lerp camera CFrame toward target
 RunService.RenderStepped:Connect(function()
-    updateAimbotCircle()
     if aimbotEnabled then
         local targetRoot = getClosestEnemy()
         if targetRoot then
@@ -235,9 +226,6 @@ RunService.RenderStepped:Connect(function()
             
             -- Smoothly aim towards target (0.3 lerp factor for smoothness)
             camera.CFrame = camera.CFrame:Lerp(newCFrame, 0.3)
-
-            -- Optional: Fire if you want
-            -- pcall(function() mouse1click() end)  -- Uncomment if your exploit supports mouse click simulation
         end
     end
 end)
