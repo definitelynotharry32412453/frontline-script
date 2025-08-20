@@ -1,63 +1,67 @@
---// Configuration
-local HITBOX_SIZE = Vector3.new(10, 10, 10)
-local TRANSPARENCY = 1
+--// Configurable Settings
+local HITBOX_SIZE       = Vector3.new(10, 10, 10)
+local TRANSPARENCY      = 1
+local HITBOX_RADIUS     = 5
 local ENABLE_NOTIFICATIONS = false
-local HITBOX_RADIUS = 5
-local ENEMY_NAME = "soldier_model"
-local FRIENDLY_TAG = "friendly_marker"
-local START_TIME = os.clock()
+local ENEMY_NAME        = "soldier_model"
+local FRIENDLY_TAG      = "friendly_marker"
 
---// Safe Notification Function
-local function notify(title, text, duration)
+local startTime = os.clock()
+
+--// Safe Notification
+local function notify(title, message, duration)
     pcall(function()
         game.StarterGui:SetCore("SendNotification", {
             Title = title,
-            Text = text,
+            Text = message,
             Duration = duration or 5
         })
     end)
 end
 
-notify("Script", "Loading script...")
+notify("Script", "Loading...", 5)
 
 --// Load ESP Library
-local esp = loadstring(game:HttpGet("https://raw.githubusercontent.com/andrewc0de/Roblox/main/Dependencies/ESP.lua"))()
-if not esp then
-    notify("Script", "Failed to load ESP library.", 5)
+local success, esp = pcall(function()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/andrewc0de/Roblox/main/Dependencies/ESP.lua"))()
+end)
+
+if not success or not esp then
+    notify("Error", "Failed to load ESP library.", 5)
     return
 end
 
---// Configure ESP
+--// ESP Configuration
 esp:Toggle(true)
-esp.Boxes = true
-esp.Names = false
+esp.Boxes   = true
+esp.Names   = false
 esp.Tracers = false
 esp.Players = false
 
---// Add ESP Listener for Enemies
+--// Add Listener for Enemy Models
 esp:AddObjectListener(workspace, {
-    Name = ENEMY_NAME,
-    Type = "Model",
-    Color = Color3.fromRGB(255, 0, 4),
-    PrimaryPart = function(obj)
+    Name        = ENEMY_NAME,
+    Type        = "Model",
+    Color       = Color3.fromRGB(255, 0, 4),
+    PrimaryPart = function(model)
         local root
         repeat
-            root = obj:FindFirstChild("HumanoidRootPart")
+            root = model:FindFirstChild("HumanoidRootPart")
             task.wait()
         until root
         return root
     end,
-    Validator = function(obj)
+    Validator   = function(model)
         task.wait(1)
-        return not obj:FindFirstChild(FRIENDLY_TAG)
+        return not model:FindFirstChild(FRIENDLY_TAG)
     end,
-    CustomName = "?",
-    IsEnabled = "enemy"
+    CustomName  = "?",
+    IsEnabled   = "enemy"
 })
 esp.enemy = true
 
---// Apply Hitbox Function
-local function applyHitboxes(model)
+--// Hitbox Application Logic
+local function applyHitbox(model)
     local root = model:FindFirstChild("HumanoidRootPart")
     if not root then return end
     local pos = root.Position
@@ -65,33 +69,32 @@ local function applyHitboxes(model)
     for _, part in ipairs(workspace:GetChildren()) do
         if part:IsA("BasePart") and (part.Position - pos).Magnitude <= HITBOX_RADIUS then
             part.Transparency = TRANSPARENCY
-            part.Size = HITBOX_SIZE
+            part.Size         = HITBOX_SIZE
         end
     end
 end
 
---// Initial Hitbox Application
+--// Apply Hitboxes to Existing Enemies
 task.wait(1)
-for _, v in ipairs(workspace:GetDescendants()) do
-    if v:IsA("Model") and v.Name == ENEMY_NAME and not v:FindFirstChild(FRIENDLY_TAG) then
-        applyHitboxes(v)
+for _, model in ipairs(workspace:GetDescendants()) do
+    if model:IsA("Model") and model.Name == ENEMY_NAME and not model:FindFirstChild(FRIENDLY_TAG) then
+        applyHitbox(model)
     end
 end
 
---// On Enemy Spawn
+--// Handle Newly Spawned Enemies
 workspace.DescendantAdded:Connect(function(descendant)
     task.wait(1)
     if descendant:IsA("Model") and descendant.Name == ENEMY_NAME and not descendant:FindFirstChild(FRIENDLY_TAG) then
-        applyHitboxes(descendant)
+        applyHitbox(descendant)
         if ENABLE_NOTIFICATIONS then
-            notify("Script", "[Warning] New Enemy Spawned! Hitboxes applied.", 3)
+            notify("Script", "[Warning] New Enemy Spawned! Hitbox Applied.", 3)
         end
     end
 end)
 
---// Final Load Notification
-local loadTime = os.clock() - START_TIME
-local rating = (loadTime < 3) and "fast" or (loadTime < 5) and "acceptable" or "slow"
-
-notify("Script", string.format("Script loaded in %.2f seconds (%s)", loadTime, rating))
+--// Final Notification with Load Time
+local elapsed = os.clock() - startTime
+local rating = (elapsed < 3) and "fast" or (elapsed < 5) and "acceptable" or "slow"
+notify("Script", string.format("Loaded in %.2f seconds — %s.", elapsed, rating), 5)
 
