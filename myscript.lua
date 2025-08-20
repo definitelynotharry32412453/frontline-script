@@ -1,35 +1,28 @@
---[[ WARNING: Use at your own risk! ]]--
-
+--// SETTINGS
 local size = Vector3.new(10, 10, 10)
 local trans = 1
 local notifications = false
 local hitboxesEnabled = true
 local espEnabled = true
 
-local start = os.clock()
-
--- Notification helper
+--// NOTIFICATION FUNCTION
 local function notify(title, text, duration)
     pcall(function()
         game.StarterGui:SetCore("SendNotification", {
             Title = title,
             Text = text,
-            Duration = duration or 5,
+            Duration = duration or 5
         })
     end)
 end
 
-notify("Script", "Loading script...", 5)
-
--- Load ESP library
+--// LOAD ESP
 local esp = loadstring(game:HttpGet("https://raw.githubusercontent.com/andrewc0de/Roblox/main/Dependencies/ESP.lua"))()
-esp:Toggle(true)
 esp.Boxes = true
 esp.Names = false
 esp.Tracers = false
 esp.Players = false
 
--- ESP object listener
 esp:AddObjectListener(workspace, {
     Name = "soldier_model",
     Type = "Model",
@@ -49,9 +42,11 @@ esp:AddObjectListener(workspace, {
     CustomName = "?",
     IsEnabled = "enemy"
 })
-esp.enemy = true
 
--- Apply hitboxes
+esp.enemy = true
+esp:Toggle(true)
+
+--// APPLY HITBOX
 local function applyHitbox(model)
     if not hitboxesEnabled then return end
     local root = model:FindFirstChild("HumanoidRootPart")
@@ -68,113 +63,78 @@ local function applyHitbox(model)
     end
 end
 
--- Initial hitbox application
+--// INITIAL HITBOXES
 task.wait(1)
 for _, model in pairs(workspace:GetDescendants()) do
-    if model.Name == "soldier_model" and model:IsA("Model") and not model:FindFirstChild("friendly_marker") then
+    if model:IsA("Model") and model.Name == "soldier_model" and not model:FindFirstChild("friendly_marker") then
         applyHitbox(model)
     end
 end
 
--- Detect new enemies
+--// LISTEN FOR NEW ENEMIES
 workspace.DescendantAdded:Connect(function(descendant)
     task.wait(1)
     if descendant:IsA("Model") and descendant.Name == "soldier_model" and not descendant:FindFirstChild("friendly_marker") then
         applyHitbox(descendant)
         if notifications then
-            notify("Script", "[Warning] New Enemy Spawned!", 3)
+            notify("Script", "[!] New Enemy Spawned!", 3)
         end
     end
 end)
 
--- GUI Setup
+--// GUI SETUP
 local player = game:GetService("Players").LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-
-local screenGui = Instance.new("ScreenGui", playerGui)
-screenGui.Name = "HitboxScriptGUI"
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 screenGui.ResetOnSpawn = false
+screenGui.Name = "ScriptControlGUI"
 
-local mainFrame = Instance.new("Frame", screenGui)
-mainFrame.Size = UDim2.new(0, 230, 0, 180)
-mainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-mainFrame.Draggable = true
+local frame = Instance.new("Frame", screenGui)
+frame.Size = UDim2.new(0, 220, 0, 180)
+frame.Position = UDim2.new(0.05, 0, 0.3, 0)
+frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+frame.Active = true
+frame.Draggable = true
 
-local titleLabel = Instance.new("TextLabel", mainFrame)
-titleLabel.Size = UDim2.new(1, 0, 0, 30)
-titleLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-titleLabel.TextColor3 = Color3.new(1, 1, 1)
-titleLabel.Font = Enum.Font.SourceSansBold
-titleLabel.TextSize = 18
-titleLabel.Text = "Hitbox Script Controller"
-titleLabel.BorderSizePixel = 0
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 18
+title.Text = "Script Controls"
 
--- Hitbox Toggle Button
-local hitboxToggle = Instance.new("TextButton", mainFrame)
-hitboxToggle.Size = UDim2.new(0.8, 0, 0, 35)
-hitboxToggle.Position = UDim2.new(0.1, 0, 0, 40)
-hitboxToggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-hitboxToggle.TextColor3 = Color3.new(1, 1, 1)
-hitboxToggle.Font = Enum.Font.SourceSans
-hitboxToggle.TextSize = 16
-hitboxToggle.Text = "Hitboxes: ON"
+--// BUTTON FUNCTION
+local function createButton(text, yPos, callback)
+    local button = Instance.new("TextButton", frame)
+    button.Size = UDim2.new(0.8, 0, 0, 35)
+    button.Position = UDim2.new(0.1, 0, 0, yPos)
+    button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.Font = Enum.Font.SourceSans
+    button.TextSize = 16
+    button.Text = text
+    button.MouseButton1Click:Connect(callback)
+    return button
+end
 
-hitboxToggle.MouseButton1Click:Connect(function()
+--// BUTTONS
+local hitboxBtn = createButton("Hitboxes: ON", 40, function()
     hitboxesEnabled = not hitboxesEnabled
-    hitboxToggle.Text = hitboxesEnabled and "Hitboxes: ON" or "Hitboxes: OFF"
-
-    if not hitboxesEnabled then
-        for _, bp in pairs(workspace:GetChildren()) do
-            if bp:IsA("BasePart") and bp.Transparency == trans and bp.Size == size then
-                bp.Transparency = 0
-                bp.Size = Vector3.new(1, 1, 1)
-            end
-        end
-    else
-        for _, model in pairs(workspace:GetDescendants()) do
-            if model.Name == "soldier_model" and model:IsA("Model") and not model:FindFirstChild("friendly_marker") then
-                applyHitbox(model)
-            end
-        end
-    end
+    hitboxBtn.Text = hitboxesEnabled and "Hitboxes: ON" or "Hitboxes: OFF"
 end)
 
--- Notifications Toggle
-local notifToggle = Instance.new("TextButton", mainFrame)
-notifToggle.Size = UDim2.new(0.8, 0, 0, 35)
-notifToggle.Position = UDim2.new(0.1, 0, 0, 80)
-notifToggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-notifToggle.TextColor3 = Color3.new(1, 1, 1)
-notifToggle.Font = Enum.Font.SourceSans
-notifToggle.TextSize = 16
-notifToggle.Text = "Notifications: OFF"
-
-notifToggle.MouseButton1Click:Connect(function()
+local notifBtn = createButton("Notifications: OFF", 80, function()
     notifications = not notifications
-    notifToggle.Text = notifications and "Notifications: ON" or "Notifications: OFF"
+    notifBtn.Text = notifications and "Notifications: ON" or "Notifications: OFF"
 end)
 
--- ESP Toggle
-local espToggle = Instance.new("TextButton", mainFrame)
-espToggle.Size = UDim2.new(0.8, 0, 0, 35)
-espToggle.Position = UDim2.new(0.1, 0, 0, 120)
-espToggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-espToggle.TextColor3 = Color3.new(1, 1, 1)
-espToggle.Font = Enum.Font.SourceSans
-espToggle.TextSize = 16
-espToggle.Text = "ESP: ON"
-
-espToggle.MouseButton1Click:Connect(function()
+local espBtn = createButton("ESP: ON", 120, function()
     espEnabled = not espEnabled
+    esp.enemy = espEnabled
     esp:Toggle(espEnabled)
-    espToggle.Text = espEnabled and "ESP: ON" or "ESP: OFF"
+    espBtn.Text = espEnabled and "ESP: ON" or "ESP: OFF"
 end)
 
--- Final load message
-local finish = os.clock()
-local elapsed = finish - start
-local rating = (elapsed < 3) and "fast" or (elapsed < 5) and "acceptable" or "slow"
-notify("Script", string.format("Loaded in %.2f seconds (%s)", elapsed, rating), 5)
+--// FINAL LOAD MESSAGE
+local loadTime = os.clock()
+notify("Script", string.format("Loaded in %.2f seconds", loadTime), 5)
