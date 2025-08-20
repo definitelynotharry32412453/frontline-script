@@ -6,7 +6,7 @@ local TRANSPARENCY = 1
 local notifications = false
 local hitboxesEnabled = true
 local espEnabled = true
-local aimbotEnabled = false
+local aimbotEnabled = false  -- default off
 
 -- Notification helper
 local function notify(title, text, duration)
@@ -91,17 +91,17 @@ workspace.DescendantAdded:Connect(function(descendant)
 end)
 
 -- GUI Setup
-local player = game:GetService("Players").LocalPlayer
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
-local mouse = player:GetMouse()
-
 local screenGui = Instance.new("ScreenGui", playerGui)
 screenGui.Name = "ScriptControlGUI"
 screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 10
 
 local frame = Instance.new("Frame", screenGui)
-frame.Size = UDim2.new(0, 220, 0, 220) -- increased height for aimbot button
+frame.Size = UDim2.new(0, 220, 0, 220)
 frame.Position = UDim2.new(0.1, 0, 0.1, 0)
 frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 frame.BorderSizePixel = 0
@@ -163,41 +163,46 @@ local espBtn = createButton("ESP: ON", 120, function()
     end
 end)
 
--- Draw aimbot circle
-local circleRadius = 100
-local aimbotCircle = Instance.new("Frame", screenGui)
-aimbotCircle.Size = UDim2.new(0, circleRadius*2, 0, circleRadius*2)
-aimbotCircle.Position = UDim2.new(0.5, -circleRadius, 0.5, -circleRadius)
-aimbotCircle.BackgroundTransparency = 0.75
-aimbotCircle.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-aimbotCircle.BorderColor3 = Color3.fromRGB(255, 255, 255)
-aimbotCircle.BorderSizePixel = 2
-aimbotCircle.Visible = false
-aimbotCircle.ZIndex = 10
-aimbotCircle.ClipsDescendants = true
-aimbotCircle.AnchorPoint = Vector2.new(0.5, 0.5)
-aimbotCircle.Name = "AimbotCircle"
-local uicorner = Instance.new("UICorner", aimbotCircle)
-uicorner.CornerRadius = UDim.new(1, 0)
-
 -- Toggle Aimbot
 local aimbotBtn = createButton("Aimbot: OFF", 160, function()
     aimbotEnabled = not aimbotEnabled
     aimbotBtn.Text = aimbotEnabled and "Aimbot: ON" or "Aimbot: OFF"
-    aimbotCircle.Visible = aimbotEnabled
     notify("Toggle", "Aimbot " .. (aimbotEnabled and "enabled" or "disabled"), 3)
 end)
 
--- Aimbot logic
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+-- Aimbot Circle
+local circleRadius = 150
+local aimbotCircle = Instance.new("Frame", screenGui)
+aimbotCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+aimbotCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
+aimbotCircle.Size = UDim2.new(0, circleRadius * 2, 0, circleRadius * 2)
+aimbotCircle.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+aimbotCircle.BackgroundTransparency = 0.5
+aimbotCircle.BorderSizePixel = 0
+aimbotCircle.Visible = false
+aimbotCircle.ZIndex = 10
+aimbotCircle.ClipsDescendants = true
+aimbotCircle.AutomaticSize = Enum.AutomaticSize.None
+aimbotCircle.Shape = Enum.FrameShape.Circle or nil  -- if your Roblox version supports it
+
+-- Roblox doesn't natively support circle frames, so we use a UICorner:
+local uiCorner = Instance.new("UICorner", aimbotCircle)
+uiCorner.CornerRadius = UDim.new(1, 0)
+
+-- Show/hide circle based on aimbot toggle
+local function updateAimbotCircle()
+    aimbotCircle.Visible = aimbotEnabled
+end
+updateAimbotCircle()
+
+-- Setup services
 local camera = workspace.CurrentCamera
-local Players = game:GetService("Players")
+local mouse = player:GetMouse()
 
-local function getClosestEnemyInCircle()
+-- Find closest enemy humanoidrootpart within circleRadius from center of screen (mouse position)
+local function getClosestEnemy()
     local closestEnemy = nil
-    local closestDistance = circleRadius -- max distance in pixels
-
+    local shortestDist = circleRadius
     for _, model in ipairs(workspace:GetDescendants()) do
         if model:IsA("Model") and model.Name == "soldier_model" and not model:FindFirstChild("friendly_marker") then
             local rootPart = model:FindFirstChild("HumanoidRootPart")
@@ -205,9 +210,9 @@ local function getClosestEnemyInCircle()
                 local screenPos, onScreen = camera:WorldToViewportPoint(rootPart.Position)
                 if onScreen then
                     local dist = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(mouse.X, mouse.Y)).Magnitude
-                    if dist <= closestDistance then
-                        closestDistance = dist
-                        closestEnemy = model
+                    if dist <= shortestDist then
+                        shortestDist = dist
+                        closestEnemy = rootPart
                     end
                 end
             end
@@ -216,28 +221,23 @@ local function getClosestEnemyInCircle()
     return closestEnemy
 end
 
-RunService.Heartbeat:Connect(function()
+-- Smooth aiming: lerp camera CFrame toward target
+RunService.RenderStepped:Connect(function()
+    updateAimbotCircle()
     if aimbotEnabled then
-        local target = getClosestEnemyInCircle()
-        if target then
-            local rootPart = target:FindFirstChild("HumanoidRootPart")
-            if rootPart then
-                -- Aim at target by setting camera CFrame towards it
-                local character = player.Character
-                if character and character:FindFirstChild("HumanoidRootPart") then
-                    local camPos = camera.CFrame.Position
-                    local targetPos = rootPart.Position
-                    local newCFrame = CFrame.new(camPos, targetPos)
-                    camera.CFrame = newCFrame
+        local targetRoot = getClosestEnemy()
+        if targetRoot then
+            local camPos = camera.CFrame.Position
+            local targetPos = targetRoot.Position
+            
+            local direction = (targetPos - camPos).Unit
+            local newCFrame = CFrame.new(camPos, camPos + direction)
+            
+            -- Smoothly aim towards target (0.3 lerp factor for smoothness)
+            camera.CFrame = camera.CFrame:Lerp(newCFrame, 0.3)
 
-                    -- Simulate left mouse click to shoot
-                    -- This may or may not work depending on your exploit/tool
-                    mouse1click = mouse1click or function() end
-                    pcall(function()
-                        mouse1click()
-                    end)
-                end
-            end
+            -- Optional: Fire if you want
+            -- pcall(function() mouse1click() end)  -- Uncomment if your exploit supports mouse click simulation
         end
     end
 end)
@@ -245,3 +245,4 @@ end)
 -- Final Load Notification
 local loadTime = os.clock()
 notify("Loaded", string.format("Loaded in %.2f seconds", loadTime), 5)
+
