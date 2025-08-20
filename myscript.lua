@@ -1,7 +1,6 @@
 --[[ WARNING: Use at your own risk! ]]--
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
 local workspace = game:GetService("Workspace")
 
@@ -9,17 +8,18 @@ local workspace = game:GetService("Workspace")
 pcall(function()
     StarterGui:SetCore("SendNotification", {
         Title = "ESP Script",
-        Text = "3D ESP loaded successfully!",
+        Text = "Player-style ESP loaded successfully!",
         Duration = 5
     })
 end)
 
--- Config
+-- Configuration
 local BOX_COLOR = Color3.fromRGB(255, 0, 0)
 local BOX_TRANSPARENCY = 0.6
+local PARTS_TO_ESP = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "LeftUpperArm", "RightUpperArm", "LeftUpperLeg", "RightUpperLeg"}
 
--- Table to store esp boxes per model
-local espBoxes = {}
+-- Table to track ESP adornments per part
+local espAdornments = {}
 
 local function notify(title, text, duration)
     pcall(function()
@@ -31,59 +31,63 @@ local function notify(title, text, duration)
     end)
 end
 
-local function create3DBox(model)
-    local root = model:FindFirstChild("HumanoidRootPart")
-    if not root then return end
+local function createOutline(part)
+    if not part or not part:IsA("BasePart") then return end
 
-    -- If box already exists, don't recreate
-    if espBoxes[model] then return end
-
-    -- Get model size accurately using GetBoundingBox
-    local cframe, size = model:GetBoundingBox()
+    -- Don't create multiple adornments on same part
+    if espAdornments[part] then return end
 
     local box = Instance.new("BoxHandleAdornment")
-    box.Name = "ESP_Box"
-    box.Adornee = root
+    box.Name = "ESP_PartOutline"
+    box.Adornee = part
     box.AlwaysOnTop = true
     box.ZIndex = 10
-    box.Size = size * Vector3.new(1, 1, 1) -- keep actual model size
+    box.Size = part.Size + Vector3.new(0.1, 0.1, 0.1) -- slightly bigger for outline effect
     box.Transparency = BOX_TRANSPARENCY
     box.Color3 = BOX_COLOR
     box.Visible = true
-    box.Parent = root
+    box.Parent = part
 
-    espBoxes[model] = box
-
-    -- Notify about new enemy ESP
-    notify("ESP", "New enemy detected and highlighted!", 4)
+    espAdornments[part] = box
 end
 
-local function remove3DBox(model)
-    local box = espBoxes[model]
-    if box then
-        box:Destroy()
-        espBoxes[model] = nil
+local function removeOutlinesFromModel(model)
+    for part, box in pairs(espAdornments) do
+        if part and part:IsDescendantOf(model) then
+            box:Destroy()
+            espAdornments[part] = nil
+        end
     end
 end
 
--- Add boxes for existing enemies
+local function setupModelESP(model)
+    for _, partName in ipairs(PARTS_TO_ESP) do
+        local part = model:FindFirstChild(partName)
+        if part then
+            createOutline(part)
+        end
+    end
+end
+
+-- Add ESP to existing enemies
 for _, model in ipairs(workspace:GetDescendants()) do
     if model:IsA("Model") and model.Name == "soldier_model" and not model:FindFirstChild("friendly_marker") then
-        create3DBox(model)
+        setupModelESP(model)
     end
 end
 
--- Listen for new enemy spawn
+-- Listen for new enemy spawns
 workspace.DescendantAdded:Connect(function(descendant)
     if descendant:IsA("Model") and descendant.Name == "soldier_model" and not descendant:FindFirstChild("friendly_marker") then
-        create3DBox(descendant)
+        setupModelESP(descendant)
+        notify("ESP", "New enemy detected and ESP applied!", 4)
     end
 end)
 
--- Remove boxes when enemy despawns
+-- Remove ESP when enemy despawns
 workspace.DescendantRemoving:Connect(function(descendant)
-    if espBoxes[descendant] then
-        remove3DBox(descendant)
+    if descendant:IsA("Model") and descendant.Name == "soldier_model" then
+        removeOutlinesFromModel(descendant)
     end
 end)
 
