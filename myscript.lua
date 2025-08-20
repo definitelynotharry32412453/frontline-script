@@ -6,7 +6,7 @@ local TRANSPARENCY = 1
 local notifications = false
 local hitboxesEnabled = true
 local espEnabled = true
-local aimbotEnabled = true  -- Enabled at start
+local aimbotEnabled = true  -- Enabled by default
 
 -- Notification helper
 local function notify(title, text, duration)
@@ -90,108 +90,15 @@ workspace.DescendantAdded:Connect(function(descendant)
     end
 end)
 
--- GUI Setup
+-- Aimbot Logic
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-local screenGui = Instance.new("ScreenGui", playerGui)
-screenGui.Name = "ScriptControlGUI"
-screenGui.ResetOnSpawn = false
-screenGui.DisplayOrder = 10
-
-local frame = Instance.new("Frame", screenGui)
-frame.Size = UDim2.new(0, 220, 0, 220)
-frame.Position = UDim2.new(0.1, 0, 0.1, 0)
-frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
-
-local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1, 0, 0, 30)
-title.Position = UDim2.new(0, 0, 0, 0)
-title.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-title.Text = " Script Controls "
-title.TextColor3 = Color3.new(1, 1, 1)
-title.Font = Enum.Font.SourceSansBold
-title.TextSize = 18
-title.BorderSizePixel = 0
-
--- Unified button creation
-local function createButton(text, yPos, onClick)
-    local btn = Instance.new("TextButton", frame)
-    btn.Size = UDim2.new(0.8, 0, 0, 35)
-    btn.Position = UDim2.new(0.1, 0, 0, yPos)
-    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Font = Enum.Font.SourceSans
-    btn.TextSize = 16
-    btn.Text = text
-    btn.AutoButtonColor = true
-    btn.MouseButton1Click:Connect(onClick)
-    return btn
-end
-
--- Toggle Hitboxes
-local hitboxBtn = createButton("Hitboxes: ON", 40, function()
-    hitboxesEnabled = not hitboxesEnabled
-    hitboxBtn.Text = hitboxesEnabled and "Hitboxes: ON" or "Hitboxes: OFF"
-    notify("Toggle", "Hitboxes " .. (hitboxesEnabled and "enabled" or "disabled"), 3)
-end)
-
--- Toggle Notifications
-local notifBtn = createButton("Notifications: OFF", 80, function()
-    notifications = not notifications
-    notifBtn.Text = notifications and "Notifications: ON" or "Notifications: OFF"
-    notify("Toggle", "Notifications " .. (notifications and "enabled" or "disabled"), 3)
-end)
-
--- Toggle ESP
-local espBtn = createButton("ESP: ON", 120, function()
-    espEnabled = not espEnabled
-    espBtn.Text = espEnabled and "ESP: ON" or "ESP: OFF"
-
-    if espEnabled then
-        esp.enemy = true
-        esp:Toggle(true)
-        notify("Toggle", "ESP enabled", 3)
-    else
-        esp.enemy = false
-        esp:Toggle(false)
-        notify("Toggle", "ESP disabled", 3)
-    end
-end)
-
--- Toggle Aimbot
-local aimbotBtn = createButton("Aimbot: ON", 160, function()
-    aimbotEnabled = not aimbotEnabled
-    aimbotBtn.Text = aimbotEnabled and "Aimbot: ON" or "Aimbot: OFF"
-    aimbotCircle.Visible = aimbotEnabled
-    notify("Toggle", "Aimbot " .. (aimbotEnabled and "enabled" or "disabled"), 3)
-end)
-
--- Aimbot Circle
-local circleRadius = 150
-local aimbotCircle = Instance.new("Frame", screenGui)
-aimbotCircle.AnchorPoint = Vector2.new(0.5, 0.5)
-aimbotCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
-aimbotCircle.Size = UDim2.new(0, circleRadius * 2, 0, circleRadius * 2)
-aimbotCircle.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-aimbotCircle.BackgroundTransparency = 0.5
-aimbotCircle.BorderSizePixel = 0
-aimbotCircle.Visible = aimbotEnabled
-aimbotCircle.ZIndex = 10
-aimbotCircle.ClipsDescendants = true
-
-local uiCorner = Instance.new("UICorner", aimbotCircle)
-uiCorner.CornerRadius = UDim.new(1, 0)
-
--- Setup services
 local camera = workspace.CurrentCamera
 local mouse = player:GetMouse()
+local circleRadius = 150
 
--- Find closest enemy humanoidrootpart within circleRadius from center of screen (mouse position)
+-- Find closest enemy HumanoidRootPart within circle radius from mouse
 local function getClosestEnemy()
     local closestEnemy = nil
     local shortestDist = circleRadius
@@ -213,24 +120,20 @@ local function getClosestEnemy()
     return closestEnemy
 end
 
--- Smooth aiming: lerp camera CFrame toward target
+-- Smooth aiming toward target
 RunService.RenderStepped:Connect(function()
     if aimbotEnabled then
         local targetRoot = getClosestEnemy()
         if targetRoot then
             local camPos = camera.CFrame.Position
             local targetPos = targetRoot.Position
-            
             local direction = (targetPos - camPos).Unit
             local newCFrame = CFrame.new(camPos, camPos + direction)
-            
-            -- Smoothly aim towards target (0.3 lerp factor for smoothness)
             camera.CFrame = camera.CFrame:Lerp(newCFrame, 0.3)
         end
     end
 end)
 
--- Final Load Notification
-local loadTime = os.clock()
-notify("Loaded", string.format("Loaded in %.2f seconds", loadTime), 5)
+notify("Loaded", "Aimbot enabled and running.", 5)
+
 
