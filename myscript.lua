@@ -1,20 +1,12 @@
 --[[ WARNING: Use at your own risk! ]]--
 
--- CONFIGURATION
 local HITBOX_SIZE = Vector3.new(10, 10, 10)
-local TRANSPARENCY = 1
+local TRANSPARENCY = 0.5 -- semi-transparent for 3D boxes
 local NOTIFICATIONS = false
 
-local AIM_FOV = 100 -- pixels radius for aimbot target lock
-local AIM_SMOOTHNESS = 0.15 -- how fast the camera moves to target (0.1-0.3 good)
-
--- SERVICES
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+local workspace = game:GetService("Workspace")
 
--- NOTIFY HELPER
 local function notify(title, text, duration)
     if NOTIFICATIONS then
         pcall(function()
@@ -27,124 +19,79 @@ local function notify(title, text, duration)
     end
 end
 
-notify("Script", "Loading script...", 3)
+notify("Script", "Loading 3D Box ESP...", 3)
 
--- LOAD ESP LIBRARY
-local espLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/andrewc0de/Roblox/main/Dependencies/ESP.lua"))()
-if not espLib then
-    notify("Error", "Failed to load ESP library.", 5)
-    return
-end
+-- Table to keep track of 3D ESP boxes
+local espBoxes = {}
 
-local esp = espLib
-esp.Boxes = true
-esp.Names = false
-esp.Tracers = false
-esp.Players = false
-
--- Add enemy listener to ESP for "soldier_model" (enemy)
-esp:AddObjectListener(workspace, {
-    Name = "soldier_model",
-    Type = "Model",
-    Color = Color3.fromRGB(255, 0, 4),
-    PrimaryPart = function(obj)
-        local root
-        repeat
-            root = obj:FindFirstChild("HumanoidRootPart")
-            task.wait()
-        until root
-        return root
-    end,
-    Validator = function(obj)
-        task.wait(1)
-        return not obj:FindFirstChild("friendly_marker")
-    end,
-    CustomName = "?",
-    IsEnabled = "enemy"
-})
-
-esp.enemy = true
-esp:Toggle(true)
-
--- APPLY HITBOXES TO ENEMIES
-local function applyHitbox(model)
+-- Create a 3D box around a model's HumanoidRootPart
+local function create3DBox(model)
     local root = model:FindFirstChild("HumanoidRootPart")
     if not root then return end
-    local pos = root.Position
-    for _, part in ipairs(workspace:GetChildren()) do
-        if part:IsA("BasePart") and (part.Position - pos).Magnitude <= 5 then
-            part.Transparency = TRANSPARENCY
-            part.Size = HITBOX_SIZE
+
+    -- Create a transparent part to act as a 3D box
+    local box = Instance.new("Part")
+    box.Name = "ESP_Box"
+    box.Anchored = true
+    box.CanCollide = false
+    box.Transparency = TRANSPARENCY
+    box.Size = HITBOX_SIZE
+    box.Material = Enum.Material.Neon
+    box.Color = Color3.fromRGB(255, 0, 0)
+    box.CFrame = root.CFrame
+    box.Parent = workspace
+
+    espBoxes[model] = box
+
+    -- Update box position every frame
+    spawn(function()
+        while box and box.Parent and model and model.Parent do
+            if root and root.Parent then
+                box.CFrame = root.CFrame
+            else
+                break
+            end
+            task.wait()
         end
+        if box then
+            box:Destroy()
+            espBoxes[model] = nil
+        end
+    end)
+end
+
+-- Remove box when model is removed
+local function remove3DBox(model)
+    local box = espBoxes[model]
+    if box then
+        box:Destroy()
+        espBoxes[model] = nil
     end
 end
 
--- Initial hitboxes on existing enemies
-task.wait(1)
+-- Initial setup: add boxes for existing enemies
 for _, model in ipairs(workspace:GetDescendants()) do
     if model:IsA("Model") and model.Name == "soldier_model" and not model:FindFirstChild("friendly_marker") then
-        applyHitbox(model)
+        create3DBox(model)
     end
 end
 
--- Apply hitbox when new enemy spawns
+-- Listen for new enemies spawning
 workspace.DescendantAdded:Connect(function(descendant)
     task.wait(1)
     if descendant:IsA("Model") and descendant.Name == "soldier_model" and not descendant:FindFirstChild("friendly_marker") then
-        applyHitbox(descendant)
+        create3DBox(descendant)
         notify("Warning", "New enemy spawned!", 3)
     end
 end)
 
--- AIMBOT FUNCTIONS
-
-local Mouse = LocalPlayer:GetMouse()
-
-local function getClosestTarget()
-    local closestTarget = nil
-    local shortestDistance = AIM_FOV
-
-    for _, model in pairs(workspace:GetChildren()) do
-        if model.Name == "soldier_model" and model:FindFirstChild("HumanoidRootPart") and not model:FindFirstChild("friendly_marker") then
-            local hrp = model.HumanoidRootPart
-            local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-            if onScreen then
-                local mousePos = Vector2.new(Mouse.X, Mouse.Y)
-                local targetPos = Vector2.new(screenPos.X, screenPos.Y)
-                local dist = (targetPos - mousePos).Magnitude
-
-                if dist < shortestDistance then
-                    shortestDistance = dist
-                    closestTarget = hrp
-                end
-            end
-        end
-    end
-
-    return closestTarget
-end
-
-local function aimAt(target)
-    if not target then return end
-    local camCFrame = Camera.CFrame
-    local direction = (target.Position - camCFrame.Position).Unit
-    local targetCFrame = CFrame.new(camCFrame.Position, camCFrame.Position + direction)
-    Camera.CFrame = camCFrame:Lerp(targetCFrame, AIM_SMOOTHNESS)
-end
-
--- AIMBOT LOOP
-RunService.RenderStepped:Connect(function()
-    local target = getClosestTarget()
-    if target then
-        aimAt(target)
-
-        -- Simulate left mouse click (works with most injectors)
-        mouse1press()
-        task.wait(0.01)
-        mouse1release()
+-- Clean up when enemy models are removed
+workspace.DescendantRemoving:Connect(function(descendant)
+    if espBoxes[descendant] then
+        remove3DBox(descendant)
     end
 end)
 
-notify("Script", "Loaded!", 3)
+notify("Script", "3D Box ESP Loaded!", 3)
 
 
